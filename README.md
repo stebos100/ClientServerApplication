@@ -138,7 +138,7 @@ positionClient.exe 127.0.0.1 12345 BTCUSDT.BKN 800 true # Windows
 2. **The host address (127....)**
 3. **The Server Address that the client needs to access (12345)**
 4. **The unique client ID+exchange (BTCUSDT.BN)**
-5. **How often the clients position will upate (in milliseconds) (800)**
+5. **How often the clients position will upate (in milliseconds) (800: for testing I Please limit this to less 2000)**
 6. **If we would like the debug logs to be printed, default is false (false)**
 
 #### 5. Repeat steps 3 and 4 in different terminals with different client names, this will ensure maximal interaction between server and client
