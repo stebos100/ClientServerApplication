@@ -118,8 +118,10 @@ g++ -std=c++17 -g src\\Client\\mainClient.cpp src\\Client\\PositionClient.cpp -I
 positionServer.exe false # Windows
 ```
 
-**Please note that the client application has two command line arguments, 1 to execute the .exe file, and the second (Boolean) is whether the user would like debug Log files to be printed, for the test application it is set to false, but if you would like a more detailed view of the interaction please set this to true**
+**Please note that the client application has two command line arguments**
 
+1. **The executable file (.exe)**
+2. **(Boolean) is whether the user would like debug Log files to be printed, for the test application it is set to false, but if you would like a more detailed view of the interaction please set this to true**
 
 **For the Client application:**
 
@@ -138,7 +140,7 @@ positionClient.exe 127.0.0.1 12345 BTCUSDT.BKN 800 true # Windows
 2. **The host address (127....)**
 3. **The Server Address that the client needs to access (12345)**
 4. **The unique client ID+exchange (BTCUSDT.BN)**
-5. **How often the clients position will upate (in milliseconds) (800: for testing I Please limit this to less 2000)**
+5. **How often the clients position will upate (in milliseconds) (800: for testing I Please limit this to less 2000 or extend server lifetime in mainServer.cpp)**
 6. **If we would like the debug logs to be printed, default is false (false)**
 
 #### 5. Repeat steps 3 and 4 in different terminals with different client names, this will ensure maximal interaction between server and client
