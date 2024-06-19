@@ -99,7 +99,7 @@ g++ -std=c++17 -g src\\Server\\mainServer.cpp src\\Server\\PositionServer.cpp -I
 ```
 
 2. **For the Client application:**
-3. 
+
 ```
 g++ -std=c++17 -g src\\Client\\mainClient.cpp src\\Client\\PositionClient.cpp -I include -I C:\\local\\boost_1_76_0 -L C:\\local\\boost_1_76_0\\stage\\lib -o build\\PositionClient.exe -lboost_system -lboost_thread -lws2_32
 ```
@@ -143,33 +143,6 @@ positionClient.exe 127.0.0.1 12345 BTCUSDT.BKN 800 true # Windows
 
 #### 5. Repeat steps 3 and 4 in different terminals with different client names, this will ensure maximal interaction between server and client
 
-
-## Simulating High-Frequency Trading (HFT) Interactions
-
-In high-frequency trading (HFT), multiple trading systems or exchanges interact with each other at extremely high speeds to capitalize on market inefficiencies. To effectively simulate these interactions, it is essential to represent each exchange as an independent entity that can operate concurrently and communicate with a central server. This is why we run multiple clients in different terminals.
-
-### Why Use Multiple Terminals for Clients?
-
-1. **Isolation of Processes**:
-   Each terminal represents an independent client process, simulating a separate exchange or trading system. This isolation ensures that the behavior of one client does not directly interfere with others, providing a more realistic simulation of a distributed trading environment.
-
-2. **Concurrent Interactions**:
-   Running multiple clients concurrently allows us to simulate real-world scenarios where multiple exchanges interact with a central server simultaneously. This concurrency is crucial for testing the performance and robustness of the server under conditions that closely mimic live trading environments.
-
-3. **Independent Data Streams**:
-   Each client can send and receive its own data stream, representing different market data and orders. This diversity in data helps test the server's ability to handle various types of information and ensures that the system can process and broadcast updates accurately and efficiently.
-
-4. **Realistic Testing Environment**:
-   In HFT, exchanges operate independently but interact frequently. By running multiple clients, we can test the server's ability to handle rapid data exchange and ensure that it maintains consistency and accuracy across all connected clients. This setup helps identify potential bottlenecks or issues in the server's performance.
-
-### Example Use Case
-
-Imagine running three clients in three different terminals, each representing a different exchange (e.g., Exchange A, Exchange B, and Exchange C). These clients can send their respective market data and order updates to the central server. The server, in turn, broadcasts these updates to all connected clients, simulating the real-time data flow and interaction between exchanges in an HFT environment.
-
-By running this simulation, we can observe how the server handles multiple data streams, processes information concurrently, and maintains data integrity across all clients. This setup provides valuable insights into the system's performance and reliability, which are critical factors in high-frequency trading.
-
-Running multiple clients in different terminals helps us create a realistic and effective testing environment for our server-client application, ensuring that it can meet the demands of high-frequency trading.
-
 ## Notes
 The clients will send their ID to the server upon connection.
 
@@ -189,7 +162,7 @@ mainServer.cpp: Main file to start the server(Located in src/Server).
 
 mainClient.cpp: Main file to start a client(Located in src/Client).
 
-### Example for Testing (The default): 
+## Example for Testing (The default): 
 
 #### command lines used for Server: 
 
@@ -213,6 +186,96 @@ mainClient.cpp: Main file to start a client(Located in src/Client).
 ```
 
 ### Example Output From server: 
+
+```
+./PositionServer.exe false
+Starting PositionServer on port 12345
+Starting worker threads
+Running io_context
+As an example, I am going to keep the server running for 60 seconds (self set)
+This can be altered for testing OR the server can be closed prematurely by pushing CTRL C...
+Accepted connection from: 127.0.0.1 with Client ID: BTCUSDT.BN
+Accepted connection from: 127.0.0.1 with Client ID: BTCUSDT.HB
+Accepted connection from: 127.0.0.1 with Client ID: BTCUSDT.KRKN
+
+Client BTCUSDT.KRKN closed connection.
+
+
+Client BTCUSDT.KRKN disconnected and removed from the set.
+
+Client BTCUSDT.BN closed connection.
+
+
+Client BTCUSDT.BN disconnected and removed from the set.
+
+Client BTCUSDT.HB closed connection.
+
+
+Client BTCUSDT.HB disconnected and removed from the set.
+Server stopped.
+Stopping server...
+Server resources cleaned up and stopped.
+
+```
+### Example Output From Client (Terminal 2: BTCUSDT.BN):
+
+```
+Received broadcast on ClientID: BTCUSDT.BN| Update for Client: BTCUSDT.HB, Net Position: 71.4657, Timestamp of update: 2024-Jun-19 18:05:44
+
+Received broadcast on ClientID: BTCUSDT.BN| Update for Client: BTCUSDT.KRKN, Net Position: 76.9948, Timestamp of update: 2024-Jun-19 18:05:44
+
+Received broadcast on ClientID: BTCUSDT.BN| Update for Client: BTCUSDT.HB, Net Position: 78.4795, Timestamp of update: 2024-Jun-19 18:05:44
+
+Received broadcast on ClientID: BTCUSDT.BN| Update for Client: BTCUSDT.KRKN, Net Position: 99.3953, Timestamp of update: 2024-Jun-19 18:05:45
+
+Received broadcast on ClientID: BTCUSDT.BN| Update for Client: BTCUSDT.KRKN, Net Position: 78.8712, Timestamp of update: 2024-Jun-19 18:05:45
+
+Received broadcast on ClientID: BTCUSDT.BN| Update for Client: BTCUSDT.HB, Net Position: 83.1269, Timestamp of update: 2024-Jun-19 18:05:45
+
+.......
+
+Received broadcast on ClientID: BTCUSDT.BN| Update for Client: BTCUSDT.HB, Net Position: 80.3377, Timestamp of update: 2024-Jun-19 18:05:54
+
+Received broadcast on ClientID: BTCUSDT.BN| Update for Client: BTCUSDT.HB, Net Position: 71.4785, Timestamp of update: 2024-Jun-19 18:05:55
+
+Received broadcast on ClientID: BTCUSDT.BN| Update for Client: BTCUSDT.HB, Net Position: 80.6918, Timestamp of update: 2024-Jun-19 18:05:55
+
+Received broadcast on ClientID: BTCUSDT.BN| Update for Client: BTCUSDT.HB, Net Position: 77.865, Timestamp of update: 2024-Jun-19 18:05:56
+
+Successfully joined client thread...
+Position client has been destructed...
+```
+## Simulating High-Frequency Trading (HFT) Interactions
+
+In high-frequency trading (HFT), multiple trading systems or exchanges interact with each other at extremely high speeds to capitalize on market inefficiencies. To effectively simulate these interactions, it is essential to represent each exchange as an independent entity that can operate concurrently and communicate with a central server. This is why we run multiple clients in different terminals.
+
+### Why Did I use Multiple Terminals for Clients?
+
+1. **Isolation of Processes**:
+   Each terminal represents an independent client process, simulating a separate exchange or trading system. This isolation ensures that the behavior of one client does not directly interfere with others, providing a more realistic simulation of a distributed trading environment.
+
+2. **Concurrent Interactions**:
+   Running multiple clients concurrently allows us to simulate real-world scenarios where multiple exchanges interact with a central server simultaneously. This concurrency is crucial for testing the performance and robustness of the server under different conditions.
+
+3. **Independent Data Streams**:
+   Each client can send and receive its own data stream, representing different market data and orders. This diversity in data helps test the server's ability to handle various types of information and ensures that the system can process and broadcast updates accurately and efficiently.
+
+4. **Realistic Testing Environment**:
+   In HFT, exchanges operate independently but interact frequently. By running multiple clients, we can test the server's ability to handle rapid data exchange and ensure that it maintains consistency and accuracy across all connected clients.
+
+### Why a TCP server application ? 
+
+#### Correctness: 
+
+TCP ensures all clients have a consistent view of positions by guaranteeing reliable and error-free data delivery. This keeps all strategies on the same page.
+
+#### Order Preservation: 
+TCP delivers data in the exact order it was sent, which is crucial in HFT where the sequence of updates matters. No risk of scrambled data.
+
+#### Resilience: 
+TCP handles dropped connections and packet loss with retransmissions and flow control, ensuring no information is lost even if there are network issues.
+
+In short, TCP is the best fit for ensuring our HFT desk's strategies stay accurate and synchronized.
 
 
 
