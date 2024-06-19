@@ -13,6 +13,7 @@ PositionServer::~PositionServer() {
 }
 
 void PositionServer::start() {
+
     std::cout << "Starting PositionServer on port " << acceptor_.local_endpoint().port() << std::endl;
 
     accept_thread_ = std::thread([this]() {
@@ -29,6 +30,7 @@ void PositionServer::start() {
 }
 
 void PositionServer::stop() {
+
     std::cout << "Stopping server..." << std::endl;
     running_ = false;
     work_guard_.reset();
@@ -36,6 +38,7 @@ void PositionServer::stop() {
     boost::system::error_code ec;
     acceptor_.close(ec);
     if (ec) {
+
         std::cerr << "Error closing acceptor: " << ec.message() << std::endl;
     }
 
@@ -52,6 +55,7 @@ void PositionServer::stop() {
     }
 
     for (auto& thread : worker_threads_) {
+
         if (thread.joinable() && debugLogs_) {
 
             std::lock_guard<std::mutex> lock(print_mutex);
@@ -78,6 +82,7 @@ void PositionServer::do_accept() {
 
     acceptor_.async_accept(*socket, [this, socket](boost::system::error_code ec) {
         if (!ec) {
+
             message_t message;
             boost::system::error_code error;
             size_t length = socket->read_some(boost::asio::buffer(&message, sizeof(message_t)), error);
@@ -95,14 +100,14 @@ void PositionServer::do_accept() {
             {
                 std::lock_guard<std::mutex> lock(clients_mutex_);
                 if (connected_client_ids_.find(received_symbol) != connected_client_ids_.end()) {
-                    // Client ID already exists, reject the connection
+
                     std::lock_guard<std::mutex> lock(print_mutex);
                     std::cerr << "Client ID " << received_symbol << " already exists. Rejecting connection." << std::endl;
                     socket->close();
                     return;
 
                 } else {
-                    // Client ID is unique, accept the connection
+
                     connected_client_ids_.insert(received_symbol);
                     clients_.insert(socket);
                 }
@@ -114,8 +119,10 @@ void PositionServer::do_accept() {
             }
 
             std::thread(&PositionServer::handle_client, this, socket, received_symbol).detach();
+
         } else {
             if (running_) {
+
                 std::lock_guard<std::mutex> lock(print_mutex);
                 std::cerr << "Accept error: " << ec.message() << std::endl;
             }
@@ -138,14 +145,17 @@ void PositionServer::handle_client(std::shared_ptr<tcp::socket> socket, const st
 
             if (error) {
                 if (error == boost::asio::error::eof) {
+
                     std::lock_guard<std::mutex> lock(print_mutex);
                     std::cout << "\nClient " << client_id << " closed connection.\n" << std::endl;
                     break;
                 } else if (error == boost::asio::error::operation_aborted) {
+
                     std::lock_guard<std::mutex> lock(print_mutex);
                     std::cout << "Operation aborted for client " << client_id << ".\n" << std::endl;
                     break;
                 } else {
+
                     std::lock_guard<std::mutex> lock(print_mutex);
                     std::cerr << "Error in handle_client for " << client_id << ": " << error.message() << std::endl;
                     break;
@@ -161,6 +171,7 @@ void PositionServer::handle_client(std::shared_ptr<tcp::socket> socket, const st
         }
     } catch (const std::exception& e) {
         if (running_) {
+
             std::lock_guard<std::mutex> lock(print_mutex);
             std::cerr << "Exception in handle_client for " << client_id << ": " << e.what() << "\n";
         }
@@ -176,15 +187,18 @@ void PositionServer::handle_client(std::shared_ptr<tcp::socket> socket, const st
 }
 
 void PositionServer::enqueue_message(const message_t& message) {
+
     while (!message_queue_.push(message)) {
         std::this_thread::yield();
     }
 }
 
 void PositionServer::process_messages() {
+
     while (running_) {
 
         message_t message;
+
         while (message_queue_.pop(message)) {
 
             std::lock_guard<std::mutex> lock(clients_mutex_);
@@ -198,11 +212,13 @@ void PositionServer::process_messages() {
                     boost::asio::async_write(*client, boost::asio::buffer(*buffer),
                         [this, client, buffer, message](boost::system::error_code ec, std::size_t length) {
                             if (ec) {
+
                                 std::cerr << "Failed to send message: " << ec.message() << std::endl;
-                                clients_.erase(client); // Remove the client from the set
+                                clients_.erase(client); 
 
                             } 
                             else if (debugLogs_) {
+                                
                                 std::lock_guard<std::mutex> lock(print_mutex);                          
                                 std::cout << "\nSent broadcast: Client: " << std::string(message.symbol.data()) << ", Net Position: " << message.net_position << ", Timestamp of client: " << std::string(message.timestamp.data()) << std::endl;
                             }

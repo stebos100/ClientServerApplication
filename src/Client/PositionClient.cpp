@@ -25,6 +25,7 @@ void PositionClient::start() {
         try {
             io_context_.run(); 
         } catch (const std::exception& e) {
+
             std::lock_guard<std::mutex> lock(print_mutex);
             std::cerr << "Exception in io_context.run(): " << e.what() << std::endl;
         }
@@ -41,8 +42,6 @@ void PositionClient::stop() {
 
     socket_.close();
     io_context_.stop();
-    // io_context_.stop();
-    // socket_.close();
 
     if (receive_thread_.joinable()) {
 
@@ -85,7 +84,9 @@ void PositionClient::send_position(const message_t& message) {
 void PositionClient::do_receive() {
     try {
         while (running_) {
+
             message_t message;
+            
             boost::system::error_code error;
             size_t length = socket_.read_some(boost::asio::buffer(&message, sizeof(message_t)), error);
 
