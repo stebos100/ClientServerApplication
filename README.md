@@ -131,7 +131,7 @@ positionServer.exe false # Windows
 ##### Run the following commands in shell (The more teminals openend in this manner the better !! ie more clients) 
 
 ```
-./positionClient.exe 127.0.0.1 12345 BTCUSDT.BKN 800 false# Linux/macOS
+./positionClient 127.0.0.1 12345 BTCUSDT.BKN 800 false# Linux/macOS
 positionClient.exe 127.0.0.1 12345 BTCUSDT.BKN 800 false # Windows
 ```
 **Please note that the above application has 6 fields which need to be fed into the command line**
