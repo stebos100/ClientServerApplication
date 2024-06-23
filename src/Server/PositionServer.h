@@ -17,6 +17,7 @@ using boost::asio::ip::tcp;
 class PositionServer : public std::enable_shared_from_this<PositionServer> {
 public:
     PositionServer(short port,  bool& debugLogs);
+    void simulate_disconnect();
     ~PositionServer();
     void start();
     void stop();
@@ -28,8 +29,8 @@ private:
     void process_messages();
     void handle_position_request(std::shared_ptr<tcp::socket> socket, const std::string& clientID);
 
+    short port_; 
     boost::asio::io_context io_context_;
-    boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_;
     tcp::acceptor acceptor_;
     std::unordered_set<std::shared_ptr<tcp::socket>> clients_;
     std::unordered_set<std::string> connected_client_ids_;

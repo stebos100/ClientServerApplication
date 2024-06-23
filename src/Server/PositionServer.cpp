@@ -3,37 +3,19 @@
 #include <iostream>
 
 PositionServer::PositionServer(short port, bool& debugLogs)
-    : acceptor_(io_context_, tcp::endpoint(tcp::v4(), port)),
+    : port_(port), acceptor_(io_context_, tcp::endpoint(tcp::v4(), port)),
       message_queue_(1024),
-      running_(true),
-      work_guard_(boost::asio::make_work_guard(io_context_)), debugLogs_(debugLogs) {}
+      running_(false),
+      debugLogs_(debugLogs) {}
 
 PositionServer::~PositionServer() {
     stop();
-}
-
-void PositionServer::start() {
-
-    std::cout << "Starting PositionServer on port " << acceptor_.local_endpoint().port() << std::endl;
-
-    accept_thread_ = std::thread([this]() {
-        do_accept();
-        io_context_.run();
-    });
-
-    std::cout << "Starting worker threads" << std::endl;
-    for (size_t i = 0; i < 2; ++i) {
-        worker_threads_.emplace_back(&PositionServer::process_messages, this);
-    }
-
-    std::cout << "Running io_context" << std::endl;
 }
 
 void PositionServer::stop() {
 
     std::cout << "Stopping server..." << std::endl;
     running_ = false;
-    work_guard_.reset();
 
     boost::system::error_code ec;
     acceptor_.close(ec);
@@ -50,7 +32,8 @@ void PositionServer::stop() {
         std::cout << "Joining worker thread..." << std::endl;
         accept_thread_.join();
     }
-    else {
+    else if( accept_thread_.joinable()){
+
         accept_thread_.join();
     }
 
@@ -62,18 +45,48 @@ void PositionServer::stop() {
             std::cout << "Joining worker thread..." << std::endl;
             thread.join();
         }
-        else {
+        else if( thread.joinable()){
+
             thread.join();
         }
     }
 
     {                    
         clients_.clear();
+        connected_client_ids_.clear(); 
+        client_positions_.clear(); 
+
         std::lock_guard<std::mutex> lock(print_mutex);
         std::cout << "Server resources cleaned up and stopped." << std::endl;
 
     }
 
+}
+
+void PositionServer::start() {
+
+    if (running_) {
+
+        std::lock_guard<std::mutex> lock(print_mutex); 
+        std::cout << "Server is already running." << std::endl;
+        return;
+    }
+
+    running_ = true;
+    
+    std::cout << "Starting PositionServer on port " << port_ << std::endl;
+
+    accept_thread_ = std::thread([this]() {
+        do_accept();
+        io_context_.run();
+    });
+
+    std::cout << "Starting worker threads" << std::endl;
+    for (size_t i = 0; i < 2; ++i) {
+        worker_threads_.emplace_back(&PositionServer::process_messages, this);
+    }
+
+    std::cout << "Running io_context" << std::endl;
 }
 
 void PositionServer::do_accept() {
@@ -96,7 +109,6 @@ void PositionServer::do_accept() {
             std::string received_symbol(message.symbol.data(), strnlen(message.symbol.data(), message.symbol.size()));
             std::string received_timestamp(message.timestamp.data(), strnlen(message.timestamp.data(), message.timestamp.size()));
 
-
             {
                 std::lock_guard<std::mutex> lock(clients_mutex_);
                 if (connected_client_ids_.find(received_symbol) != connected_client_ids_.end()) {
@@ -117,21 +129,40 @@ void PositionServer::do_accept() {
                 std::lock_guard<std::mutex> lock(print_mutex);
                 std::cout << "Accepted connection from: " << socket->remote_endpoint().address().to_string() << " with Client ID: " << received_symbol << std::endl;
             }
-
+            
             std::thread(&PositionServer::handle_client, this, socket, received_symbol).detach();
+            do_accept();
 
         } else {
             if (running_) {
-
                 std::lock_guard<std::mutex> lock(print_mutex);
                 std::cerr << "Accept error: " << ec.message() << std::endl;
             }
         }
 
-        if (running_) {
-            do_accept();
-        }
     });
+}
+
+void PositionServer::simulate_disconnect() {
+
+    stop();
+
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    try {
+
+        acceptor_.open(tcp::v4());
+        acceptor_.set_option(boost::asio::socket_base::reuse_address(true));
+        acceptor_.bind(tcp::endpoint(tcp::v4(), port_));
+        acceptor_.listen();
+        start();
+
+    } catch (const boost::system::system_error& e) {
+
+        std::cerr << "Failed to start the acceptor: " << e.what() << std::endl;
+        stop(); 
+        return;
+    }
 }
 
 
@@ -147,7 +178,7 @@ void PositionServer::handle_client(std::shared_ptr<tcp::socket> socket, const st
                 if (error == boost::asio::error::eof) {
 
                     std::lock_guard<std::mutex> lock(print_mutex);
-                    std::cout << "\nClient " << client_id << " closed connection.\n" << std::endl;
+                    std::cout << "Client " << client_id << " closed connection.\n" << std::endl;
                     break;
                 } else if (error == boost::asio::error::operation_aborted) {
 
@@ -181,7 +212,7 @@ void PositionServer::handle_client(std::shared_ptr<tcp::socket> socket, const st
         std::scoped_lock lock(clients_mutex_, print_mutex);
         clients_.erase(socket);
         connected_client_ids_.erase(client_id);
-        std::cout << "\nClient " << client_id << " disconnected and removed from the set." << std::endl;
+        std::cout << "Client " << client_id << " disconnected and removed from the set." << std::endl;
 
     }
 }

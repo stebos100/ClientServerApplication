@@ -29,15 +29,23 @@ int main(int argc, char* argv[]) {
 
     short port = 12345;
 
-    auto server = std::make_shared<PositionServer>(port, debugLogs);
+    auto server = PositionServer(port, debugLogs);
 
-    server->start();
+    server.start();
 
-    std::cout << "As an example, I am going to keep the server running for 60 seconds (self set)\n This can be altered for testing OR the server can be closed prematurely by pushing CTRL C..." << std::endl;
+    std::cout << "As an example, I am going to keep the server running for 60 seconds (self set)\nThis can be altered for testing OR the server can be closed prematurely by pushing CTRL C..." << std::endl;
 
-    std::this_thread::sleep_for(std::chrono::seconds(45));
+    std::this_thread::sleep_for(std::chrono::seconds(60));
 
-    // server->stop();
+    server.stop(); 
+
+    // std::this_thread::sleep_for(std::chrono::seconds(3));
+
+    // auto server1 = PositionServer(port, debugLogs);
+
+    // server1.start(); 
+
+    // std::this_thread::sleep_for(std::chrono::seconds(45));
 
     std::cout << "Server stopped." << std::endl;
 
