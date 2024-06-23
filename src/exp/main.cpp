@@ -17,6 +17,7 @@ public:
 
 private:
     void start_accept() {
+        
         auto socket = std::make_shared<tcp::socket>(io_context_);
         acceptor_.async_accept(*socket, [this, socket](boost::system::error_code ec) {
             if (!ec) {

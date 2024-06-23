@@ -28,6 +28,9 @@ private:
     void enqueue_message(const message_t& message);
     void process_messages();
     void handle_position_request(std::shared_ptr<tcp::socket> socket, const std::string& clientID);
+    void start_read(std::shared_ptr<tcp::socket> socket);
+    void handle_disconnection(std::shared_ptr<tcp::socket> socket, const std::string& client_id);
+    void process_data(std::shared_ptr<tcp::socket> socket, message_t& message);
 
     short port_; 
     boost::asio::io_context io_context_;
@@ -42,7 +45,7 @@ private:
     std::vector<std::thread> worker_threads_;
     std::thread accept_thread_;
     bool debugLogs_; 
-
+    std::vector<char> buffer_;
 };
 
 #endif // POSITION_SERVER_H

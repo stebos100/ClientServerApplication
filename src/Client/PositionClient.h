@@ -17,7 +17,7 @@ using boost::asio::ip::tcp;
 class PositionClient {
 public:
     std::atomic<bool> running_;
-    PositionClient(const std::string& host, short port, const std::string& ID, bool& debugLogs);
+    PositionClient(const std::string& host, short port, const std::string& ID, bool& debugLogs, short local_port);
     void start();
     void stop();
     void send_position(message_t& message);
@@ -32,20 +32,23 @@ private:
     void do_receive();
     void restart_io_context();    
     bool connect(); 
+    bool setConnection();
     void process_data(const message_t* message, std::size_t length);
 
     message_t message_;
     std::string host_;
     short port_;
+    short local_port_;
     boost::asio::io_context io_context_;
     std::optional<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>> work_guard_;
     std::unique_ptr<boost::asio::ip::tcp::socket> socket_;
-    // tcp::socket socket_;
     std::unique_ptr<std::thread> receive_thread_;
     std::vector<char> buffer_;
     std::mutex mutex_; 
     std::string clientID_; 
     bool clientDebugLogs_;
+    std::atomic<bool> disconnected_;
+
 };
 
 #endif // POSITION_CLIENT_H
