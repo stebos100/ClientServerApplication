@@ -131,10 +131,10 @@ positionServer.exe false # Windows
 ##### Run the following commands in shell (The more teminals openend in this manner the better !! ie more clients) 
 
 ```
-./positionClient 127.0.0.1 12345 BTCUSDT.BKN 800 false# Linux/macOS
-positionClient.exe 127.0.0.1 12345 BTCUSDT.BKN 800 false # Windows
+./positionClient 127.0.0.1 12345 BTCUSDT.BKN 1200 false 1201 0 # Linux/macOS
+./positionClient.exe 127.0.0.1 12345 BTCUSDT.BKN 1200 false 1201 0 # Windows
 ```
-**Please note that the above application has 6 fields which need to be fed into the command line**
+**Please note that the above application has 8 fields which need to be fed into the command line**
 
 1. **The executable file (.exe)**
 2. **The host address (127....)**
@@ -142,6 +142,8 @@ positionClient.exe 127.0.0.1 12345 BTCUSDT.BKN 800 false # Windows
 4. **The unique client ID+exchange (BTCUSDT.BN)**
 5. **How often the clients position will upate (in milliseconds) (800: for testing I Please limit this to less 2000 or extend server lifetime in mainServer.cpp)**
 6. **Boolean value if we would like the debug logs to be printed, default is false (false)**
+7. **The local port number to ensure the socket IDs are unique (int)**
+8. **If you want the client thread to assume function 1 or 2 in the clientMain.cpp (used for testing)**
 
 #### 5. Repeat steps 3 and 4 in different terminals with different client names, this will ensure maximal interaction between server and client
 
