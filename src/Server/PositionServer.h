@@ -31,11 +31,13 @@ private:
     void start_read(std::shared_ptr<tcp::socket> socket);
     void handle_disconnection(std::shared_ptr<tcp::socket> socket, const std::string& client_id);
     void process_data(std::shared_ptr<tcp::socket> socket, message_t& message);
+    void sendPositions(const std::string& clientId, std::shared_ptr<tcp::socket> socket);
 
     short port_; 
     boost::asio::io_context io_context_;
     tcp::acceptor acceptor_;
     std::unordered_set<std::shared_ptr<tcp::socket>> clients_;
+    std::unordered_map< std::string, std::shared_ptr<tcp::socket> > clientsSocketIds_;
     std::unordered_set<std::string> connected_client_ids_;
     std::unordered_map<std::string, message_t> client_positions_;
     std::mutex clients_mutex_;
@@ -46,6 +48,7 @@ private:
     std::thread accept_thread_;
     bool debugLogs_; 
     std::vector<char> buffer_;
+    message_t acceptMessage_;
 };
 
 #endif // POSITION_SERVER_H

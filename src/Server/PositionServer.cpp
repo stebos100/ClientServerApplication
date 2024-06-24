@@ -31,20 +31,24 @@ void PositionServer::stop() {
     std::lock_guard<std::mutex> lock(print_mutex);
     std::cout << "Stopping server..." << std::endl;
 
-    // Stop accepting new connections
     boost::system::error_code ec;
     acceptor_.cancel(ec);
     acceptor_.close(ec);
 
-    // Stop io_context
     io_context_.stop();
 
-    // Join acceptor thread
+    std::cout << "Stopping server and closing all client connections...\n";
+    for (auto& client : clients_) {
+        client->close();
+    }
+    
+    clients_.clear();
+    connected_client_ids_.clear();
+
     if (accept_thread_.joinable()) {
         accept_thread_.join();
     }
 
-    // Join worker threads
     for (auto& thread : worker_threads_) {
         if (thread.joinable()) {
             thread.join();
@@ -68,7 +72,6 @@ void PositionServer::start() {
     
     std::cout << "Starting PositionServer on port " << port_ << std::endl;
 
-    // Ensure the acceptor is open and ready to accept connections
     if (!acceptor_.is_open()) {
         std::lock_guard<std::mutex> lock(print_mutex); 
         std::cerr << "Acceptor is not open." << std::endl;
@@ -76,14 +79,13 @@ void PositionServer::start() {
         return;
     }
 
-    // Start the acceptor thread to accept connections
     accept_thread_ = std::thread([this]() {
         do_accept();
         io_context_.run();
     });
 
     std::cout << "Starting worker threads" << std::endl;
-    for (size_t i = 0; i < 4; ++i) {
+    for (size_t i = 0; i < 2; ++i) {
         worker_threads_.emplace_back(&PositionServer::process_messages, this);
     }
 
@@ -115,17 +117,50 @@ void PositionServer::do_accept() {
     });
 }
 
+void PositionServer::sendPositions(const std::string& clientId, std::shared_ptr<tcp::socket> socket) {
+ 
+    std::lock_guard<std::mutex> lock(clients_mutex_);
+
+            for (auto& client : client_positions_) {
+
+                if(client.first == clientId) {
+                    continue;
+                }
+                else {
+
+                    auto & msg = client.second;
+                    
+                    boost::asio::async_write(*socket, boost::asio::buffer(&client.second, sizeof(message_t)),
+                        [this, msg , socket, clientId](boost::system::error_code ec, std::size_t length) {
+                            if (ec) {
+
+                                std::cerr << "Failed to send message: " << ec.message() << std::endl;
+                            } 
+                            else {
+
+                                std::lock_guard<std::mutex> lock(print_mutex);                
+                                std::cout << "Sending BroadCast to: " << socket->remote_endpoint().address().to_string() << ":" << socket->remote_endpoint().port() << std::endl;
+                                std::cout << "\nSent broadcast: Client positions to (" << clientId << ") upon joining:|\t " << std::string(msg.symbol.data()) << ", Net Position: " << msg.net_position << ", Timestamp of client: " << std::string(msg.timestamp.data()) << std::endl;
+                            }
+                        });
+
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+            }
+}
+
+
 void PositionServer::start_read(std::shared_ptr<tcp::socket> socket) {
 
     auto message = std::make_shared<message_t>();
 
     boost::asio::async_read(*socket, boost::asio::buffer(message.get(), sizeof(message_t)),
-        [this, socket, message](boost::system::error_code ec, std::size_t length) {
+        [this, socket, acceptMessage_ = message](boost::system::error_code ec, std::size_t length) {
             if (!ec) {
 
-                std::string received_symbol(message->symbol.data(), strnlen(message->symbol.data(), message->symbol.size()));
-                std::string received_timestamp(message->timestamp.data(), strnlen(message->timestamp.data(), message->timestamp.size()));
-                double received_net_position = message->net_position;
+                std::string received_symbol(acceptMessage_->symbol.data(), strnlen(acceptMessage_->symbol.data(), acceptMessage_->symbol.size()));
+                std::string received_timestamp(acceptMessage_->timestamp.data(), strnlen(acceptMessage_->timestamp.data(), acceptMessage_->timestamp.size()));
+                double received_net_position = acceptMessage_->net_position;
 
                 {
                     std::lock_guard<std::mutex> lock(clients_mutex_);
@@ -135,6 +170,7 @@ void PositionServer::start_read(std::shared_ptr<tcp::socket> socket) {
                         socket->close();
                         return;
                     } else {
+
                         connected_client_ids_.insert(received_symbol);
                         clients_.insert(socket);
                     }
@@ -144,6 +180,8 @@ void PositionServer::start_read(std::shared_ptr<tcp::socket> socket) {
                     std::lock_guard<std::mutex> lock(print_mutex);
                     std::cout << "Received message from client: " << received_symbol << ", net position: " << received_net_position << ", timestamp: " << received_timestamp << std::endl;
                 }
+
+                sendPositions(received_symbol, socket);
 
                 std::thread(&PositionServer::handle_client, this, socket, received_symbol).detach();
 
@@ -158,7 +196,7 @@ void PositionServer::simulate_disconnect() {
 
     stop();
 
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     try {
 
@@ -218,6 +256,13 @@ void PositionServer::handle_disconnection(std::shared_ptr<tcp::socket> socket, c
     if (it != clients_.end()) {
 
         std::string IPID = (*it)->remote_endpoint().address().to_string();
+        boost::system::error_code ec;
+
+        (*it)->close(ec);
+        if (ec) {
+            std::cerr << "Error during socket close: " << ec.message() << std::endl;
+        }
+
         clients_.erase(it);
         std::cout << "Client " << IPID << " disconnected and removed from the set." << std::endl;
     } else {
@@ -227,8 +272,8 @@ void PositionServer::handle_disconnection(std::shared_ptr<tcp::socket> socket, c
 
     if (itTwo != connected_client_ids_.end()) {
 
-        connected_client_ids_.erase(itTwo);
-        std::cout << "Client " << *itTwo << " disconnected and removed from the set." << std::endl;
+        connected_client_ids_.erase(clients_ID);
+        std::cout << "Client " << clients_ID << " disconnected and removed from the set." << std::endl;
 
     } else {
         std::lock_guard<std::mutex> lock(print_mutex);
@@ -240,6 +285,8 @@ void PositionServer::handle_disconnection(std::shared_ptr<tcp::socket> socket, c
 void PositionServer::process_data(std::shared_ptr<tcp::socket> socket, message_t& message) {
 
     std::string symbol(message.symbol.data());
+
+    if(debugLogs_) 
     {
         std::lock_guard<std::mutex> lock(print_mutex);
         std::cout << "Processing data for client: " << symbol << std::endl;
@@ -275,19 +322,18 @@ void PositionServer::process_messages() {
 
                 if (client->is_open()) {
 
-                    auto buffer = std::make_shared<std::vector<char>>(reinterpret_cast<const char*>(&message), reinterpret_cast<const char*>(&message) + sizeof(message));
-
-                    boost::asio::async_write(*client, boost::asio::buffer(*buffer),
-                        [this, client, buffer, message](boost::system::error_code ec, std::size_t length) {
+                    boost::asio::async_write(*client, boost::asio::buffer(&message, sizeof(message_t)),
+                        [this, client, message](boost::system::error_code ec, std::size_t length) {
                             if (ec) {
 
                                 std::cerr << "Failed to send message: " << ec.message() << std::endl;
                                 clients_.erase(client); 
 
                             } 
-                            else {
+                            else if(debugLogs_){
 
-                                std::lock_guard<std::mutex> lock(print_mutex);                          
+                                std::lock_guard<std::mutex> lock(print_mutex);                
+                                std::cout << "Sending BroadCast to: " << client->remote_endpoint().address().to_string() << ":" << client->remote_endpoint().port() << std::endl;
                                 std::cout << "\nSent broadcast: Client: " << std::string(message.symbol.data()) << ", Net Position: " << message.net_position << ", Timestamp of client: " << std::string(message.timestamp.data()) << std::endl;
                             }
                         });

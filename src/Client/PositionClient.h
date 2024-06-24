@@ -33,13 +33,14 @@ private:
     void restart_io_context();    
     bool connect(); 
     bool setConnection();
+    void runThreads();
     void process_data(const message_t* message, std::size_t length);
 
     message_t message_;
     std::string host_;
     short port_;
     short local_port_;
-    boost::asio::io_context io_context_;
+    std::shared_ptr<boost::asio::io_context> io_context_;
     std::optional<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>> work_guard_;
     std::unique_ptr<boost::asio::ip::tcp::socket> socket_;
     std::unique_ptr<std::thread> receive_thread_;
@@ -48,7 +49,7 @@ private:
     std::string clientID_; 
     bool clientDebugLogs_;
     std::atomic<bool> disconnected_;
-
+    std::atomic<int> reconnectCount;
 };
 
-#endif // POSITION_CLIENT_H
+#endif 

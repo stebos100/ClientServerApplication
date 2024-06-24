@@ -13,7 +13,6 @@ std::mt19937 gen(rd());
 void run_Client(const std::string& host, short port, const std::string& symbol_prefix, int index, bool requiresDebugLogs, short lclPort) {
 
     PositionClient client(host, port, symbol_prefix, requiresDebugLogs, lclPort);
-    // client.start();
 
     std::uniform_real_distribution<> dis(70.0, 100.0);
 
@@ -32,11 +31,13 @@ void run_Client(const std::string& host, short port, const std::string& symbol_p
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
 
+    client.disconnect();
+
     client.reconnect();
 
     std::this_thread::sleep_for(std::chrono::seconds(2));
 
-    for (int i = 0; i < 40; ++i) {
+    for (int i = 0; i < 30; ++i) {
 
         message_t message = {};
         std::string symbol = symbol_prefix;
@@ -44,12 +45,10 @@ void run_Client(const std::string& host, short port, const std::string& symbol_p
         message.net_position = dis(gen);
         client.send_position(message);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(index));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(index));
-
-    client.stop();
 }
 
 void run_ClientTwo(const std::string& host, short port, const std::string& symbol_prefix, int index, bool requiresDebugLogs, short lclPort) {
@@ -58,7 +57,7 @@ void run_ClientTwo(const std::string& host, short port, const std::string& symbo
 
     std::uniform_real_distribution<> dis(70.0, 100.0);
 
-    for (int i = 0; i < 30; ++i) {
+    for (int i = 0; i < 40; ++i) {
 
         if (client.running_) {
             message_t message = {};
@@ -67,7 +66,7 @@ void run_ClientTwo(const std::string& host, short port, const std::string& symbo
             message.net_position = dis(gen);
             client.send_position(message);
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            std::this_thread::sleep_for(std::chrono::milliseconds(800));
         }
     }
 

@@ -3,9 +3,11 @@
 #include "../../include/Common.h"
 
 PositionClient::PositionClient(const std::string& host, short port, const std::string& clientID, bool& debugLogs, short local_port)
-    : host_(host), port_(port), socket_(std::make_unique<tcp::socket>(io_context_)), running_(false), local_port_(local_port),
+    :   io_context_(std::make_shared<boost::asio::io_context>()), host_(host), port_(port), socket_(std::make_unique<tcp::socket>(*io_context_)), running_(false), local_port_(local_port),
       clientID_(clientID), clientDebugLogs_(debugLogs), buffer_(sizeof(message_t)), 
-      work_guard_(boost::asio::make_work_guard(io_context_)) {
+      work_guard_(boost::asio::make_work_guard(*io_context_)) {
+
+    reconnectCount = 0;
 
     std::cout << "Starting client...\n";
 
@@ -13,7 +15,7 @@ PositionClient::PositionClient(const std::string& host, short port, const std::s
 
     receive_thread_ = std::make_unique<std::thread>([this]() {
         try {
-            io_context_.run();
+            io_context_->run();
         } catch (const std::exception& e) {
             std::lock_guard<std::mutex> lock(print_mutex);
             std::cerr << "Exception in io_context.run(): " << e.what() << std::endl;
@@ -35,13 +37,15 @@ void PositionClient::start() {
     std::cout << "Starting client...\n";
 
     work_guard_.reset(); 
-    work_guard_.emplace(boost::asio::make_work_guard(io_context_));
+    work_guard_.emplace(boost::asio::make_work_guard(*io_context_));
 
     connect();
 
+    receive_thread_.reset();
+
     receive_thread_ = std::make_unique<std::thread>([this]() {
         try {
-            io_context_.run();
+            io_context_->run();
         } catch (const std::exception& e) {
             std::lock_guard<std::mutex> lock(print_mutex);
             std::cerr << "Exception in io_context.run(): " << e.what() << std::endl;
@@ -56,13 +60,14 @@ void PositionClient::stop() {
 
     running_ = false;
     disconnected_ = true;
+
     boost::system::error_code ignore;
 
     if (socket_ && socket_->is_open()) {
         socket_->close();
     }
 
-    io_context_.stop();
+    io_context_->stop();
 
     if (receive_thread_ && receive_thread_->joinable()) {
         receive_thread_->join();
@@ -70,6 +75,8 @@ void PositionClient::stop() {
 
     std::lock_guard<std::mutex> lock(print_mutex);
     std::cout << "Socket and io_context stopped, thread joined.\n";
+
+    io_context_->reset();
 }
 
 bool PositionClient::connect() {
@@ -83,17 +90,14 @@ bool PositionClient::connect() {
             std::cout << "Attempting to connect...\n";
         }
 
-        socket_ = std::make_unique<tcp::socket>(io_context_);
+        socket_ = std::make_unique<tcp::socket>(*io_context_);
 
-        tcp::resolver resolver(io_context_);
+        tcp::resolver resolver(*io_context_);
         auto endpoints = resolver.resolve(host_, std::to_string(port_));
 
-        if (local_port_ != 0) {
-
-            tcp::endpoint local_endpoint(tcp::v4(), local_port_);
-            socket_->open(tcp::v4());
-            socket_->bind(local_endpoint);
-        }
+        tcp::endpoint local_endpoint(tcp::v4(), local_port_);
+        socket_->open(tcp::v4());
+        socket_->bind(local_endpoint);
 
         boost::system::error_code ec;
         boost::asio::connect(*socket_, endpoints, ec);
@@ -112,6 +116,7 @@ bool PositionClient::connect() {
         {
             std::lock_guard<std::mutex> lock(print_mutex);
             std::cout << "Connected to server.\n";
+            std::cout << "NOW OPERATING ON :" << socket_->remote_endpoint().address().to_string() << ":" << socket_->remote_endpoint().port() << std::endl;
             running_ = true;
         }
 
@@ -162,9 +167,9 @@ bool PositionClient::setConnection() {
             std::cout << "Attempting to connect...\n";
         }
 
-        socket_ = std::make_unique<tcp::socket>(io_context_);
+        socket_ = std::make_unique<tcp::socket>(*io_context_);
 
-        tcp::resolver resolver(io_context_);
+        tcp::resolver resolver(*io_context_);
         auto endpoints = resolver.resolve(host_, std::to_string(port_));
 
         if (local_port_ != 0) {
@@ -231,9 +236,9 @@ bool PositionClient::setConnection() {
 
 void PositionClient::restart_io_context() {
 
-    io_context_.reset();
+    io_context_->reset();
     work_guard_.reset(); 
-    work_guard_.emplace(boost::asio::make_work_guard(io_context_));
+    work_guard_.emplace(boost::asio::make_work_guard(*io_context_));
 
     if (receive_thread_ && receive_thread_->joinable()) {
 
@@ -247,7 +252,34 @@ void PositionClient::restart_io_context() {
 
     receive_thread_ = std::make_unique<std::thread>([this]() {
         try {
-            io_context_.run();
+            io_context_->run();
+        } catch (const std::exception& e) {
+            std::lock_guard<std::mutex> lock(print_mutex);
+            std::cerr << "Exception in io_context.run(): " << e.what() << std::endl;
+        }
+    });
+}
+
+void PositionClient::runThreads() {
+
+    if (receive_thread_ && receive_thread_->joinable() && io_context_ -> stopped()) {
+
+        {
+            std::lock_guard<std::mutex> lock(print_mutex);
+            std::cout << "attmepting to join running thread.." << std::endl;
+        }
+
+        receive_thread_->join();
+
+        {
+            std::lock_guard<std::mutex> lock(print_mutex);
+            std::cout << "Running thread has been joined..." << std::endl;
+        }
+    }
+
+     receive_thread_ = std::make_unique<std::thread>([this]() {
+        try {
+            io_context_->run();
         } catch (const std::exception& e) {
             std::lock_guard<std::mutex> lock(print_mutex);
             std::cerr << "Exception in io_context.run(): " << e.what() << std::endl;
@@ -275,9 +307,11 @@ void PositionClient::handle_disconnection() {
     }
 
     if (socket_ && socket_->is_open()) {
+
         boost::system::error_code ec;
-        socket_->shutdown(tcp::socket::shutdown_both, ec);
+
         socket_->close(ec);
+        socket_.reset();
 
         if (!ec) {
 
@@ -287,6 +321,7 @@ void PositionClient::handle_disconnection() {
             }
 
             disconnected_ = true; 
+        
             handle_reconnect();
 
         } else {
@@ -308,30 +343,32 @@ void PositionClient::handle_reconnect() {
             std::lock_guard<std::mutex> lock(print_mutex); 
             std::cout <<"RECONNECTION CALLED INTERNALLY FROM FUNCTION FAILURE....\n";
         }
+    }
 
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-        restart_io_context();
+    std::this_thread::sleep_for(std::chrono::seconds(5));
 
-        if (connect()) {
+    restart_io_context();
 
-            {
-                std::lock_guard<std::mutex> lock(print_mutex); 
-                std::cout <<"RECONNECTION SUCCESSFUL....\n";
-            }
+    if (connect()) {
+            std::lock_guard<std::mutex> lock(print_mutex); 
+            std::cout <<"RECONNECTION SUCCESSFUL....\n";
+            std::cout << "NOW OPERATING ON :" << socket_->remote_endpoint().address().to_string() << ":" << socket_->remote_endpoint().port() << std::endl;
+            reconnectCount = 0;
             return;
-
-        } else {
-
-            {
-                std::lock_guard<std::mutex> lock(print_mutex); 
-                std::cout <<"RECONNECTION UNSUCCESSFUL....\n";
-            }
-
-            handle_reconnect(); 
-        }
     } else {
-        disconnect(); 
-        handle_reconnect();
+
+        {
+            std::lock_guard<std::mutex> lock(print_mutex); 
+            std::cout <<"RECONNECTION UNSUCCESSFUL....\n";
+            reconnectCount++; 
+        }
+
+        if (reconnectCount < 3) {
+            handle_reconnect();
+        }
+        else {
+            stop();
+        }
     }
 }
 
@@ -349,9 +386,10 @@ void PositionClient::disconnect() {
     }
     
     if (socket_ && socket_->is_open()) {
+
         boost::system::error_code ec;
-        socket_->shutdown(tcp::socket::shutdown_both, ec);
         socket_->close(ec);
+        socket_.reset();
 
         if (!ec) {
 
@@ -382,7 +420,8 @@ void PositionClient::disconnect() {
 void PositionClient::reconnect() {
 
     disconnect();
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    std::this_thread::sleep_for(std::chrono::seconds(5));
 
     {
         std::lock_guard<std::mutex> lock(print_mutex); 
@@ -394,11 +433,22 @@ void PositionClient::reconnect() {
     if (connect()) {
         std::lock_guard<std::mutex> lock(print_mutex); 
         std::cout <<"RECONNECTION SUCCESSFUL....\n";
+        std::cout << "NOW OPERATING ON :" << socket_->remote_endpoint().address().to_string() << ":" << socket_->remote_endpoint().port() << std::endl;
+        reconnectCount = 0;
         return;
     } else {
-        std::lock_guard<std::mutex> lock(print_mutex); 
-        std::cout <<"RECONNECTION UNSUCCESSFUL....\n";
-        reconnect(); 
+
+        {
+            std::lock_guard<std::mutex> lock(print_mutex); 
+            std::cout <<"RECONNECTION UNSUCCESSFUL....\n";
+        }
+
+        if (reconnectCount < 3) {
+            reconnect();
+        }
+        else {
+            stop();
+        }
     }
 }
 
@@ -436,13 +486,14 @@ void PositionClient::do_receive() {
         return;
     }
 
-    std::cout << "We have made it back to the receive function..\n";
+    // std::cout << "We have made it back to the receive function..\n";
 
     boost::asio::async_read(*socket_, boost::asio::buffer(&message_, sizeof(message_t)),
         [this](boost::system::error_code ec, std::size_t length) {
             if (!ec) {
-                std::cout << "No errors here. Processing data...\n";
+                // std::cout << "No errors here. Processing data...\n";
                 process_data(&message_, length);
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 do_receive(); 
             } else {
 
@@ -452,6 +503,7 @@ void PositionClient::do_receive() {
                 }
 
                 if (running_) {
+
                     std::cout << "Handling disconnection...\n";
                     handle_disconnection();
                 }
@@ -466,7 +518,7 @@ void PositionClient::process_data(const message_t* message, std::size_t length) 
     std::lock_guard<std::mutex> lock(print_mutex);
     std::string symbol(message->symbol.data());
 
-    std::cout << "we have entered the process data function\n";
+    // std::cout << "we have entered the process data function\n";
 
     if (symbol != clientID_) {
 
