@@ -178,44 +178,45 @@ mainClient.cpp: Main file to start a client(Located in src/Client).
 
 ##### terminal 2
 ```
-./positionClient.exe 127.0.0.1 12345 BTCUSDT.BN 800 false
+./positionClient 127.0.0.1 12345 BTCUSDT.BKN 1200 false 1201 0 # Linux/macOS
 ```
 ##### terminal 3
 ```
-./positionClient.exe 127.0.0.1 12345 BTCUSDT.HB 500 false
+./positionClient 127.0.0.1 12345 BTCUSDT.BN 1200 false 1202 0 # Linux/macOS
 ```
 ##### terminal 4
 ```
-./positionClient.exe 127.0.0.1 12345 BTCUSDT.KRKN 900 false
+./positionClient 127.0.0.1 12345 BTCUSDT.KRKN 1200 false 1203 0 # Linux/macOS
 ```
 
 ### Example Output From server: 
 
 ```
-./PositionServer.exe false
+PositionServer constructed and acceptor initialized on port 12345
 Starting PositionServer on port 12345
 Starting worker threads
 Running io_context
 As an example, I am going to keep the server running for 60 seconds (self set)
 This can be altered for testing OR the server can be closed prematurely by pushing CTRL C...
-Accepted connection from: 127.0.0.1 with Client ID: BTCUSDT.BN
-Accepted connection from: 127.0.0.1 with Client ID: BTCUSDT.HB
-Accepted connection from: 127.0.0.1 with Client ID: BTCUSDT.KRKN
 
-Client BTCUSDT.KRKN closed connection.
+Accepted connection from: 127.0.0.1:64573
+Received message from client: BTCUSDT.BKN, net position: 123.45, timestamp: 2024-Jun-24 09:56:13
+Accepted connection from: 127.0.0.1:64574
+Received message from client: BTCUSDT.BN, net position: 123.45, timestamp: 2024-Jun-24 09:56:14
+Sending BroadCast to: 127.0.0.1:64574
 
+Sent broadcast: Client position upon joining to Client BTCUSDT.BN:|   BTCUSDT.BKN, Net Position: 95.9567, Timestamp of client: 2024-Jun-24 09:56:14
 
-Client BTCUSDT.KRKN disconnected and removed from the set.
+Client BTCUSDT.BKN closed connection.
+Client 127.0.0.1 disconnected and removed from the set.
+Client BTCUSDT.BKN disconnected and removed from the set.
 
-Client BTCUSDT.BN closed connection.
+Accepted connection from: 127.0.0.1:64575
+Received message from client: BTCUSDT.BKN, net position: 123.45, timestamp: 2024-Jun-24 09:56:28
+Sending BroadCast to: 127.0.0.1:64575
 
+Sent broadcast: Client position upon joining to Client BTCUSDT.BKN:|   BTCUSDT.BN, Net Position: 88.8986, Timestamp of client: 2024-Jun-24 09:56:27
 
-Client BTCUSDT.BN disconnected and removed from the set.
-
-Client BTCUSDT.HB closed connection.
-
-
-Client BTCUSDT.HB disconnected and removed from the set.
 Server stopped.
 Stopping server...
 Server resources cleaned up and stopped.
